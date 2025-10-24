@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>📸 사진 + 프레임 선택</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; }
+  body {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: #111;
+    color: #fff;
+    font-family: 'Noto Sans KR', sans-serif;
+    padding: 10px;
+    gap: 20px;
+    overflow: hidden;
+  }
+
+  /* 왼쪽: 선택한 사진 4장 */
+  .photo-list {
+    flex: 0 0 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    border-right: 1px solid #555;
+    padding: 5px;
+    height: 95vh;
+  }
+  .photo-list img {
+    width: 100%;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  /* 중앙: 프레임 + 사진 슬롯 */
+  .frame-display-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .frame-display {
+    position: relative;
+    width: 650px;
+    height: 950px;
+    border: 2px solid #fff;
+    border-radius: 10px;
+    background: #222;
+    overflow: hidden;
+  }
+
+  .slot {
+    position: absolute;
+    border: 1px dashed rgba(255,255,255,0.5);
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 3px;
+  }
+  .slot1 { top: 7%; left: 5.8%; width: 41.7%; height: 37.5%; }
+  .slot2 { top: 14%; left: 53.3%; width: 41%; height: 37.5%; }
+  .slot3 { top: 48.3%; left: 5.7%; width: 41.7%; height: 37.6%; }
+  .slot4 { top: 55.5%; left: 53.3%; width: 41%; height: 37.5%; }
+
+  .slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .frame-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* 오른쪽: 프레임 선택 */
+  .frame-selector {
+    flex: 0 0 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    height: 95vh;
+  }
+  .frame-selector img {
+    width: 100%;
+    border: 3px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s, border 0.2s;
+  }
+  .frame-selector img:hover { transform: scale(1.05); }
+  .frame-selector img.selected { border: 3px solid #00ccff; }
+</style>
+</head>
+<body>
+
+  <!-- 왼쪽: 선택한 사진 4장 -->
+  <div class="photo-list" id="photoList"></div>
+
+  <!-- 중앙: 프레임 + 슬롯 -->
+  <div class="frame-display-container">
+    <div class="frame-display" id="frameDisplay">
+      <div class="slot slot1"></div>
+      <div class="slot slot2"></div>
+      <div class="slot slot3"></div>
+      <div class="slot slot4"></div>
+    </div>
+  </div>
+
+  <!-- 오른쪽: 프레임 선택 -->
+  <div class="frame-selector" id="frameSelector">
+    <img src="frame1.png" class="frame-option" alt="프레임1">
+    <img src="frames/frame2.png" class="frame-option" alt="프레임2">
+    <img src="frames/frame3.png" class="frame-option" alt="프레임3">
+    <img src="frames/frame4.png" class="frame-option" alt="프레임4">
+  </div>
+
+  <!-- ✅ Interact.js 추가 -->
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+<script>
+  const photoList = document.getElementById('photoList');
+  const frameDisplay = document.getElementById('frameDisplay');
+  const slots = frameDisplay.querySelectorAll('.slot');
+  let selectedFrameSrc = null;
+  let selectedPhotoSrc = null;
+
+  // ✅ 카메라에서 저장된 사진 불러오기
+  const selectedPhotos = JSON.parse(localStorage.getItem('selectedPhotos') || '[]');
+
+  // 왼쪽 사진 목록 표시
+  selectedPhotos.forEach(src => {
+    const img = document.createElement('img');
+    img.src = src;
+    photoList.appendChild(img);
+
+    img.addEventListener('click', () => {
+      selectedPhotoSrc = src;
+      photoList.querySelectorAll('img').forEach(p => p.style.outline = '');
+      img.style.outline = '3px solid #00ccff';
+    });
+  });
+
+  // 프레임 선택
+  document.querySelectorAll('.frame-option').forEach(frame => {
+    frame.addEventListener('click', () => {
+      document.querySelectorAll('.frame-option').forEach(f => f.classList.remove('selected'));
+      frame.classList.add('selected');
+      selectedFrameSrc = frame.src;
+
+      // 기존 프레임 덮개 제거 후 새로 적용
+      frameDisplay.querySelectorAll('.frame-overlay').forEach(o => o.remove());
+      const overlay = document.createElement('img');
+      overlay.src = selectedFrameSrc;
+      overlay.classList.add('frame-overlay');
+      frameDisplay.appendChild(overlay);
+    });
+  });
+
+  // 슬롯 클릭 → 사진 삽입 / 제거
+  slots.forEach(slot => {
+    slot.addEventListener('click', () => {
+      if (slot.querySelector('img')) {
+        // 이미 사진 있으면 제거
+        slot.innerHTML = '';
+      } else if (selectedPhotoSrc) {
+        const img = document.createElement('img');
+        img.src = selectedPhotoSrc;
+        img.classList.add('draggable-photo');
+        img.style.transform = 'translate(0px, 0px) scale(1)';
+        slot.appendChild(img);
+        enableDrag(img);
+      }
+    });
+  });
+
+  // ✅ Interact.js로 이동 + 확대 기능 활성화
+  function enableDrag(el) {
+    let scale = 1;
+    let x = 0, y = 0;
+
+    interact(el)
+      .draggable({
+        modifiers: [
+          interact.modifiers.restrictRect({
+            restriction: 'parent', // 슬롯 내부 제한
+            endOnly: true
+          })
+        ],
+        listeners: {
+          move(event) {
+            x += event.dx;
+            y += event.dy;
+            el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+          }
+        }
+      });
+
+    // 마우스 휠 확대/축소
+    el.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.1 : -0.1;
+      scale = Math.min(Math.max(0.5, scale + delta), 3); // 0.5~3배 사이
+      el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    });
+  }
+</script>
+</body>
+</html>
